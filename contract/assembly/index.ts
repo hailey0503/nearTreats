@@ -1,40 +1,91 @@
-/*
- * This is an example of an AssemblyScript smart contract with two simple,
- * symmetric functions:
- *
- * 1. setGreeting: accepts a greeting, such as "howdy", and records it for the
- *    user (account_id) who sent the request
- * 2. getGreeting: accepts an account_id and returns the greeting saved for it,
- *    defaulting to "Hello"
- *
- * Learn more about writing NEAR smart contracts with AssemblyScript:
- * https://docs.near.org/docs/develop/contracts/as/intro
- *
- */
+import { Context, logging, storage, PersistentMap,u128,ContractPromiseBatch } from 'near-sdk-as'
 
-import { Context, logging, storage } from 'near-sdk-as'
 
-const DEFAULT_MESSAGE = 'Hello'
 
-// Exported functions will be part of the public interface for your smart contract.
-// Feel free to extract behavior to non-exported functions!
-export function getGreeting(accountId: string): string | null {
-  // This uses raw `storage.get`, a low-level way to interact with on-chain
-  // storage for simple contracts.
-  // If you have something more complex, check out persistent collections:
-  // https://docs.near.org/docs/concepts/data-storage#assemblyscript-collection-types
-  return storage.get<string>(accountId, DEFAULT_MESSAGE)
+@nearBindgen
+class Contract {
+  TargetMap : PersistentMap<string, u128>;
+  DonatedMap : PersistentMap<string, u128>;
+
+  constructor() {
+    this.TargetMap = new PersistentMap<string, u128>('target');
+    this.TargetMap.set("dogshelter1.testnet", u128.from(150));
+    this.TargetMap.set("dogshelter2.testnet", u128.from(450));
+    this.TargetMap.set("dogshelter3.testnet", u128.from(1500));
+
+    // map for token donated so far
+    this.DonatedMap = new PersistentMap<string, u128>('donated');
+    this.DonatedMap.set("dogshelter1.testnet", u128.from(20));
+    this.DonatedMap.set("dogshelter2.testnet", u128.from(50));
+    this.DonatedMap.set("dogshelter3.testnet", u128.from(700));
+    
+  }
+
+  getTarget(card:string):u128{
+    logging.log("card : " + card)
+        // return u128.from(0)
+    return this.TargetMap.getSome(card)
+  }
+
+  getDonatedSoFar(card:string):u128{
+    return this.DonatedMap.getSome(card)
+  }
+    
+  addToken(card:string, numToken:u128, receiver:string):u128{
+    logging.log('adding token');
+    // [senderID, donatedToken] pair
+    //const SenderPair = [sender, numToken]
+    //let senderList=CardMap.getSome(card); 
+    //senderList.push(SenderPair);
+  
+    this.donateToken(receiver, numToken)
+  
+    let donated = this.DonatedMap.getSome(card) 
+    let updatedDonated = u128.add(donated, numToken)
+    this.DonatedMap.set(card, donated)//map update.
+    if (updatedDonated >= this.TargetMap.getSome(card)) {
+      this.transferToken(card, updatedDonated);
+    }
+    return updatedDonated
+  }
+
+  donateToken (contractAccount:string,amount:u128):void{ //contract address
+    ContractPromiseBatch.create(contractAccount).transfer(amount);
+    logging.log("success! Tokens Donated ")
+  }
+
+  transferToken (shelterAddr:string, amount:u128):void{ //shelter addree. how to send from this account to another address
+    ContractPromiseBatch.create(shelterAddr).transfer(amount);
+    logging.log("success! Tokens Donated to the Shelter ")
+  }
+  
 }
 
-export function setGreeting(message: string): void {
-  const account_id = Context.sender
+export const contract = new Contract()
 
-  // Use logging.log to record logs permanently to the blockchain!
-  logging.log(
-    // String interpolation (`like ${this}`) is a work in progress:
-    // https://github.com/AssemblyScript/assemblyscript/pull/1115
-    'Saving greeting "' + message + '" for account "' + account_id + '"'
-  )
-
-  storage.set(account_id, message)
+export function getTarget(card:string):u128 {
+  // return u128.from(0)
+  return contract.getTarget(card)
 }
+
+export function getDonatedSoFar(card:string):u128 {
+  // return u128.from(0)
+  return contract.getDonatedSoFar(card)
+}
+
+export function addToken(card:string, numToken:u128, receiver:string):u128 {
+  return contract.addToken(card, numToken, receiver)
+}
+
+// map to store target each card 
+
+
+
+
+
+
+// // View Methods 
+
+
+
+

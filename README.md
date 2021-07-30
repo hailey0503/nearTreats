@@ -1,0 +1,2 @@
+# nearTreats
+blockchain donation platform 
